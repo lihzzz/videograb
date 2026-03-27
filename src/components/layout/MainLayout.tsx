@@ -6,6 +6,8 @@ import { VideoPreview } from "../download/VideoPreview";
 import { FormatSelector } from "../download/FormatSelector";
 import { DownloadButton } from "../download/DownloadButton";
 import { DownloadList } from "../download/DownloadList";
+import { PlaylistConfig } from "../download/PlaylistConfig";
+import { UpdateYtdlpButton } from "../download/UpdateYtdlpButton";
 import { useDownloadStore } from "../../stores/downloadStore";
 
 export function MainLayout() {
@@ -95,6 +97,17 @@ export function MainLayout() {
 
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 flex flex-col justify-end">
                   <DownloadButton />
+                </div>
+              </div>
+
+              {/* Playlist Config and Update Button */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50">
+                  <PlaylistConfig />
+                </div>
+
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50">
+                  <UpdateYtdlpButton />
                 </div>
               </div>
             </motion.div>

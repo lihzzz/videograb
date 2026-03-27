@@ -28,8 +28,11 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-function buildOutputTemplate(outputDirectory: string): string {
+function buildOutputTemplate(outputDirectory: string, isPlaylist: boolean = false): string {
   const base = outputDirectory.trim().replace(/\/+$/, "");
+  if (isPlaylist) {
+    return `${base}/%(playlist_title,playlist)s/%(playlist_index)s - %(title)s.%(ext)s`;
+  }
   return `${base}/%(title)s.%(ext)s`;
 }
 
@@ -42,6 +45,12 @@ interface DownloadStore {
   proxy: string;
   isLoading: boolean;
   error: string | null;
+  isUpdatingYtdlp: boolean;
+  playlistParams: {
+    start: number;
+    end: number | null;
+    items: string;
+  };
 
   // 方法
   setCurrentUrl: (url: string) => void;
@@ -49,12 +58,14 @@ interface DownloadStore {
   setProxy: (proxy: string) => void;
   syncProxyConfig: () => Promise<void>;
   fetchVideoInfo: (url: string) => Promise<void>;
-  startDownload: (outputPath: string) => Promise<string | null>;
+  startDownload: (outputPath: string, isPlaylist?: boolean) => Promise<string | null>;
   cancelDownload: (taskId: string) => Promise<void>;
   updateProgress: (taskId: string, progress: DownloadProgress) => void;
   updateTaskStatus: (taskId: string, status: DownloadTask["status"], error?: string) => void;
   clearError: () => void;
   removeTask: (taskId: string) => void;
+  updatePlaylistParams: (params: { start?: number; end?: number | null; items?: string }) => void;
+  updateYtdlp: () => Promise<boolean>;
 }
 
 type BackendDownloadTask = Omit<DownloadTask, "created_at" | "thumbnail" | "error"> & {
@@ -87,6 +98,12 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   proxy: readStoredProxy(),
   isLoading: false,
   error: null,
+  isUpdatingYtdlp: false,
+  playlistParams: {
+    start: 1,
+    end: null,
+    items: "",
+  },
 
   setCurrentUrl: (url) => set({ currentUrl: url }),
 
@@ -113,6 +130,29 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     }));
   },
 
+  updatePlaylistParams: (params) => {
+    set((state) => ({
+      playlistParams: {
+        ...state.playlistParams,
+        ...params,
+      },
+    }));
+  },
+
+  updateYtdlp: async () => {
+    set({ isUpdatingYtdlp: true });
+    try {
+      await invoke("update_ytdlp");
+      return true;
+    } catch (err) {
+      console.error("更新 yt-dlp 失败:", err);
+      set({ error: getErrorMessage(err, "更新 yt-dlp 失败") });
+      return false;
+    } finally {
+      set({ isUpdatingYtdlp: false });
+    }
+  },
+
   fetchVideoInfo: async (url) => {
     set({ isLoading: true, error: null, currentVideo: null });
     try {
@@ -125,18 +165,22 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     }
   },
 
-  startDownload: async (outputPath) => {
-    const { currentUrl, currentVideo, selectedFormat } = get();
+  startDownload: async (outputPath, isPlaylist = false) => {
+    const { currentUrl, currentVideo, selectedFormat, playlistParams } = get();
     if (!currentUrl || !currentVideo || !selectedFormat) return null;
 
     try {
-      const outputTemplate = buildOutputTemplate(outputPath);
+      const outputTemplate = buildOutputTemplate(outputPath, isPlaylist);
       const taskId = await invoke<string>("start_download", {
         url: currentUrl,
         formatId: selectedFormat,
         outputPath: outputTemplate,
         title: currentVideo.title,
         thumbnail: currentVideo.thumbnail,
+        isPlaylist,
+        playlistStart: playlistParams.start,
+        playlistEnd: playlistParams.end,
+        playlistItems: playlistParams.items,
       });
 
       const fallbackTask: DownloadTask = {
@@ -151,6 +195,9 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         format_id: selectedFormat,
         thumbnail: currentVideo.thumbnail,
         created_at: Date.now(),
+        is_playlist: isPlaylist,
+        playlist_title: isPlaylist ? currentVideo.playlist_title || currentVideo.title : undefined,
+        playlist_size: isPlaylist ? currentVideo.playlist_count : undefined,
       };
 
       let taskToInsert = fallbackTask;

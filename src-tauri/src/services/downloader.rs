@@ -32,6 +32,11 @@ impl DownloadManager {
         title: String,
         format_id: String,
         output_path: String,
+        thumbnail: Option<String>,
+        is_playlist: bool,
+        playlist_start: Option<i32>,
+        playlist_end: Option<i32>,
+        playlist_items: Option<String>,
     ) -> String {
         let task_id = Uuid::new_v4().to_string();
         let task = DownloadTask {
@@ -44,6 +49,11 @@ impl DownloadManager {
             eta: String::new(),
             output_path,
             format_id,
+            thumbnail,
+            is_playlist,
+            playlist_start,
+            playlist_end,
+            playlist_items,
             created_at: chrono::Utc::now().to_rfc3339(),
         };
 
@@ -78,6 +88,10 @@ impl DownloadManager {
                         &task.format_id,
                         &task.output_path,
                         &task_id_clone,
+                        task.is_playlist,
+                        task.playlist_start,
+                        task.playlist_end,
+                        task.playlist_items.as_deref(),
                     )
                     .await?;
 

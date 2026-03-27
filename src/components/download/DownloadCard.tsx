@@ -1,4 +1,4 @@
-import { Download, CheckCircle, XCircle, Loader2, Pause, File, Trash2 } from "lucide-react";
+import { Download, CheckCircle, XCircle, Loader2, Pause, File, Trash2, ListVideo } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import { Button } from "../common/Button";
@@ -78,6 +78,17 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
               </span>
             )}
           </div>
+
+          {/* 播放列表信息 */}
+          {task.is_playlist && task.playlist_title && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+              <ListVideo className="h-3 w-3" />
+              <span>{task.playlist_title}</span>
+              {task.playlist_size && (
+                <span>({task.playlist_size} 个项目)</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 操作按钮 */}

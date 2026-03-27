@@ -31,6 +31,28 @@ impl YtDlpService {
         self.proxy.read().await.clone()
     }
 
+    /// 更新 yt-dlp
+    pub async fn update_ytdlp(&self) -> Result<(), String> {
+        let mut command = Command::new(&self.ytdlp_path);
+        command.arg("-U");
+
+        let output = command
+            .output()
+            .await
+            .map_err(|e| format!("执行 yt-dlp 更新失败: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format_command_failure(
+                "更新 yt-dlp 失败",
+                &output.status,
+                &output.stderr,
+                &output.stdout,
+            ));
+        }
+
+        Ok(())
+    }
+
     /// 获取视频信息
     pub async fn fetch_video_info(&self, url: &str) -> Result<VideoInfo, String> {
         let mut command = Command::new(&self.ytdlp_path);
@@ -67,6 +89,10 @@ impl YtDlpService {
         format_id: &str,
         output_path: &str,
         task_id: &str,
+        is_playlist: bool,
+        playlist_start: Option<i32>,
+        playlist_end: Option<i32>,
+        playlist_items: Option<&str>,
     ) -> Result<Child, String> {
         let mut command = Command::new(&self.ytdlp_path);
         command.args([
@@ -80,6 +106,23 @@ impl YtDlpService {
             "%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
             "--no-warnings",
         ]);
+
+        // 添加播放列表相关参数
+        if is_playlist {
+            if let Some(start) = playlist_start {
+                command.arg("--playlist-start").arg(start.to_string());
+            }
+            if let Some(end) = playlist_end {
+                command.arg("--playlist-end").arg(end.to_string());
+            }
+            if let Some(items) = playlist_items {
+                command.arg("--playlist-items").arg(items);
+            }
+        } else {
+            // 不是播放列表则只下载第一个视频
+            command.arg("--playlist-start").arg("1").arg("--playlist-end").arg("1");
+        }
+
         if let Some(proxy) = self.current_proxy().await {
             command.arg("--proxy").arg(proxy);
         }
