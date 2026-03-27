@@ -1,4 +1,4 @@
-import { Video, Download, Sparkles } from "lucide-react";
+import { Video, Download, Sparkles, MonitorPlay } from "lucide-react";
 import { motion } from "framer-motion";
 import { UrlInput } from "../download/UrlInput";
 import { ProxyConfig } from "../download/ProxyConfig";
@@ -18,11 +18,13 @@ export function MainLayout() {
         <div className="px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Video className="h-8 w-8 text-primary-600" />
-              <Sparkles className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                <MonitorPlay className="h-6 w-6 text-white" />
+              </div>
+              <Sparkles className="h-3 w-3 text-yellow-400 absolute -top-1 -right-1" />
             </div>
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
                 VideoGrab
               </h1>
               <p className="text-xs text-muted-foreground">智能视频下载器</p>
@@ -44,6 +46,11 @@ export function MainLayout() {
         >
           {/* Hero Section */}
           <div className="text-center mb-10">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
+                <MonitorPlay className="h-8 w-8 text-white" />
+              </div>
+            </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-3">
               轻松下载视频
             </h2>
