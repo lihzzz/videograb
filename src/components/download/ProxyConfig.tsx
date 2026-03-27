@@ -32,7 +32,7 @@ export function ProxyConfig() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 mt-2">
       <label className="text-sm font-medium flex items-center gap-2">
         <Network className="h-4 w-4" />
         代理设置
@@ -54,9 +54,6 @@ export function ProxyConfig() {
             <Save className="h-4 w-4" />
             保存
           </Button>
-        </div>
-
-        <div className="flex justify-end">
           <Button
             variant="outline"
             size="md"
