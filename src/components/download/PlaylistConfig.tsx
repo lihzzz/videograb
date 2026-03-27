@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ListVideo, Settings, ChevronDown, ChevronUp } from "lucide-react";
+import { ListVideo, ChevronDown, ChevronUp } from "lucide-react";
 import { useDownloadStore } from "../../stores/downloadStore";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
