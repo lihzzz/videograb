@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Network, Save, XCircle, X } from "lucide-react";
+import { Network, Save, X } from "lucide-react";
 import { useDownloadStore } from "../../stores/downloadStore";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";

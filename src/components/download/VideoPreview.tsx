@@ -1,4 +1,4 @@
-import { Play, Clock, User, Calendar, VideoIcon, FileText } from "lucide-react";
+import { Clock, User, Calendar, VideoIcon, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import type { VideoFormat } from "../../types/download";

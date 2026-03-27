@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FolderOpen, Download, Sparkles } from "lucide-react";
+import { Download, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import { Button } from "../common/Button";

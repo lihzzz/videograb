@@ -1,4 +1,4 @@
-import { Video, Download, Sparkles, MonitorPlay } from "lucide-react";
+import { Download, Sparkles, MonitorPlay } from "lucide-react";
 import { motion } from "framer-motion";
 import { UrlInput } from "../download/UrlInput";
 import { ProxyConfig } from "../download/ProxyConfig";

@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "VideoGrab",
   "version": "1.0.0",
-  "identifier": "com.videograb.app",
+  "identifier": "com.videograb.main",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
