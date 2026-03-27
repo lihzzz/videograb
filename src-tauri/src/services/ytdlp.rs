@@ -56,7 +56,7 @@ impl YtDlpService {
     /// 获取视频信息
     pub async fn fetch_video_info(&self, url: &str) -> Result<VideoInfo, String> {
         let mut command = Command::new(&self.ytdlp_path);
-        command.args(["--dump-json", "--no-download", "--no-warnings"]);
+        command.args(["--dump-single-json", "--no-download", "--no-warnings"]);
         if let Some(proxy) = self.current_proxy().await {
             command.arg("--proxy").arg(proxy);
         }
