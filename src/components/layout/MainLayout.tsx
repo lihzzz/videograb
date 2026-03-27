@@ -7,7 +7,6 @@ import { VideoPreview } from "../download/VideoPreview";
 import { FormatSelector } from "../download/FormatSelector";
 import { DownloadButton } from "../download/DownloadButton";
 import { DownloadList } from "../download/DownloadList";
-import { PlaylistConfig } from "../download/PlaylistConfig";
 import { UpdateYtdlpButton } from "../download/UpdateYtdlpButton";
 import { useDownloadStore } from "../../stores/downloadStore";
 
@@ -33,8 +32,8 @@ export function MainLayout() {
               <p className="text-xs text-muted-foreground">智能视频下载器</p>
             </div>
           </div>
-          <div className="text-sm text-muted-foreground hidden sm:block">
-            macOS 专业版
+          <div className="text-sm text-muted-foreground">
+            <UpdateYtdlpButton />
           </div>
         </div>
       </header>
@@ -94,24 +93,19 @@ export function MainLayout() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50">
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 md:col-span-2">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">选择格式</h3>
-                  <FormatSelector />
-                </div>
-
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 flex flex-col justify-end">
-                  <DownloadButton />
-                </div>
-              </div>
-
-              {/* Playlist Config and Update Button */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50">
-                  <PlaylistConfig />
-                </div>
-
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50">
-                  <UpdateYtdlpButton />
+                  <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+                    <div className="xl:col-span-3">
+                      <FormatSelector />
+                    </div>
+                    <div className="xl:col-span-2">
+                      <div className="h-full rounded-xl border border-border/60 bg-secondary-50/30 p-4 flex flex-col justify-end">
+                        <h4 className="text-sm font-medium text-gray-900 mb-3">下载动作</h4>
+                        <DownloadButton />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>
