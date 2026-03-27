@@ -1,0 +1,17 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the app",
+  "permissions": [
+    "core:default",
+    "shell:allow-spawn",
+    "shell:allow-execute",
+    "fs:default",
+    "fs:scope-download",
+    "fs:scope-download-recursive",
+    "fs:scope-home",
+    "fs:scope-home-recursive",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
+}
