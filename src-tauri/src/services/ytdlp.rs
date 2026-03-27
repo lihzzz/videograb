@@ -70,7 +70,13 @@ impl YtDlpService {
     /// 获取视频信息
     pub async fn fetch_video_info(&self, url: &str) -> Result<VideoInfo, String> {
         let mut command = Command::new(&self.ytdlp_path);
-        command.args(["--dump-single-json", "--no-download", "--no-warnings"]);
+        command.args([
+            "--dump-single-json",
+            "--no-download",
+            "--no-warnings",
+            "--extractor-args", "youtube:player-client=web,yt-comment=force-legacy"
+        ]);
+
         if let Some(proxy) = self.current_proxy().await {
             command.arg("--proxy").arg(proxy);
         }
@@ -122,6 +128,7 @@ impl YtDlpService {
             "--progress-template",
             "%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
             "--no-warnings",
+            "--extractor-args", "youtube:player-client=web,yt-comment=force-legacy"
         ]);
 
         // 添加播放列表相关参数
