@@ -118,7 +118,7 @@ impl YtDlpService {
         playlist_items: Option<&str>,
     ) -> Result<Child, String> {
         let mut command = Command::new(&self.ytdlp_path);
-        command.args([
+        let mut args = vec![
             "-f",
             format_id,
             "-o",
@@ -129,7 +129,14 @@ impl YtDlpService {
             "%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
             "--no-warnings",
             "--extractor-args", "youtube:player-client=web,yt-comment=force-legacy"
-        ]);
+        ];
+
+        // 如果是播放列表，添加忽略错误的选项
+        if is_playlist {
+            args.extend(&["--ignore-errors"]);
+        }
+
+        command.args(args);
 
         // 添加播放列表相关参数
         if is_playlist {
