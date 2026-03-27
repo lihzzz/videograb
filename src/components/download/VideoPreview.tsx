@@ -1,4 +1,5 @@
-import { Play, Clock, User, Calendar } from "lucide-react";
+import { Play, Clock, User, Calendar, VideoIcon, FileText } from "lucide-react";
+import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import type { VideoFormat } from "../../types/download";
 
@@ -59,9 +60,19 @@ export function VideoPreview() {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-600 text-sm">{error}</p>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="p-6 bg-red-50 border border-red-200 rounded-xl"
+      >
+        <div className="flex items-start gap-3">
+          <FileText className="h-5 w-5 text-red-600 mt-0.5" />
+          <div>
+            <h4 className="font-semibold text-red-800 mb-1">解析失败</h4>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        </div>
+      </motion.div>
     );
   }
 
@@ -77,9 +88,13 @@ export function VideoPreview() {
     })[0];
 
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-br from-card-secondary to-white border border-border rounded-xl overflow-hidden"
+    >
       {/* 缩略图 */}
-      <div className="aspect-video bg-muted relative">
+      <div className="aspect-video bg-gradient-to-br from-muted to-gray-200 relative overflow-hidden">
         {currentVideo.thumbnail ? (
           <img
             src={currentVideo.thumbnail}
@@ -87,8 +102,8 @@ export function VideoPreview() {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Play className="h-12 w-12 text-muted-foreground" />
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-100 to-blue-100">
+            <VideoIcon className="h-16 w-16 text-primary-600 opacity-50" />
           </div>
         )}
         {currentVideo.duration && (
@@ -96,25 +111,26 @@ export function VideoPreview() {
             {formatDuration(currentVideo.duration)}
           </div>
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
       </div>
 
       {/* 信息 */}
-      <div className="p-4 space-y-2">
-        <h3 className="font-semibold text-lg leading-tight line-clamp-2">
+      <div className="p-5 space-y-3">
+        <h3 className="font-semibold text-lg leading-tight line-clamp-2 text-gray-900">
           {currentVideo.title}
         </h3>
 
         {(currentVideo.uploader || currentVideo.upload_date) && (
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground pt-2 border-t border-border/50">
             {currentVideo.uploader && (
-              <div className="flex items-center gap-1">
-                <User className="h-3.5 w-3.5" />
-                <span>{currentVideo.uploader}</span>
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span className="truncate max-w-[120px]">{currentVideo.uploader}</span>
               </div>
             )}
             {currentVideo.upload_date && (
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
                 <span>{formatDate(currentVideo.upload_date)}</span>
               </div>
             )}
@@ -122,12 +138,12 @@ export function VideoPreview() {
         )}
 
         {bestFormat && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border/50">
+            <Clock className="h-4 w-4" />
             <span>预计大小: {formatFileSize(bestFormat.filesize || bestFormat.filesize_approx)}</span>
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

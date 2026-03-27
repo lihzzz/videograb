@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Download, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import { Button } from "../common/Button";
 
@@ -31,14 +32,21 @@ export function DownloadButton() {
   if (!currentVideo) return null;
 
   return (
-    <Button
-      onClick={handleDownload}
-      disabled={!selectedFormat || isStarting}
-      size="lg"
-      className="w-full"
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
     >
-      <FolderOpen className="h-5 w-5 mr-2" />
-      {isStarting ? "准备中..." : "开始下载"}
-    </Button>
+      <Button
+        onClick={handleDownload}
+        disabled={!selectedFormat || isStarting}
+        size="lg"
+        className="w-full py-6 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 shadow-lg hover:shadow-xl transition-all duration-300"
+      >
+        <Download className="h-5 w-5 mr-2" />
+        {isStarting ? "准备中..." : "开始下载"}
+        <Sparkles className="h-4 w-4 ml-2" />
+      </Button>
+    </motion.div>
   );
 }

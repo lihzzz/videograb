@@ -1,4 +1,5 @@
-import { Download, CheckCircle, XCircle, Loader2, Pause } from "lucide-react";
+import { Download, CheckCircle, XCircle, Loader2, Pause, File, FolderOpen, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import { Button } from "../common/Button";
 import { Progress } from "../common/Progress";
@@ -39,18 +40,27 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
   const { cancelDownload, removeTask } = useDownloadStore();
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-      <div className="flex items-start gap-3">
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      className="bg-card border border-border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-start gap-4">
         {/* 缩略图 */}
         {task.thumbnail ? (
-          <img
-            src={task.thumbnail}
-            alt={task.title}
-            className="w-20 h-12 object-cover rounded"
-          />
+          <div className="relative">
+            <img
+              src={task.thumbnail}
+              alt={task.title}
+              className="w-24 h-14 object-cover rounded-lg"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg" />
+          </div>
         ) : (
-          <div className="w-20 h-12 bg-muted rounded flex items-center justify-center">
-            <Download className="h-4 w-4 text-muted-foreground" />
+          <div className="w-24 h-14 bg-gradient-to-br from-primary-100 to-blue-100 rounded-lg flex items-center justify-center">
+            <File className="h-5 w-5 text-primary-600" />
           </div>
         )}
 
@@ -62,6 +72,11 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
             <span className="text-xs text-muted-foreground">
               {getStatusText(task.status)}
             </span>
+            {task.format && (
+              <span className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                {task.format}
+              </span>
+            )}
           </div>
         </div>
 
@@ -72,8 +87,9 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
               variant="ghost"
               size="sm"
               onClick={() => cancelDownload(task.id)}
+              className="h-8 w-8 p-0"
             >
-              取消
+              <Pause className="h-4 w-4" />
             </Button>
           )}
           {(task.status === "completed" || task.status === "failed" || task.status === "cancelled") && (
@@ -81,8 +97,9 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
               variant="ghost"
               size="sm"
               onClick={() => removeTask(task.id)}
+              className="h-8 w-8 p-0"
             >
-              移除
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
         </div>
@@ -90,7 +107,7 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
 
       {/* 进度条 */}
       {task.status === "downloading" && (
-        <div className="space-y-1">
+        <div className="space-y-1 pl-28">
           <Progress value={task.progress} />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{task.speed}</span>
@@ -100,8 +117,10 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
       )}
 
       {task.status === "failed" && task.error && (
-        <p className="text-xs text-red-500">{task.error}</p>
+        <div className="pl-28">
+          <p className="text-xs text-red-500 bg-red-50 rounded px-2 py-1">{task.error}</p>
+        </div>
       )}
-    </div>
+    </motion.div>
   );
 }

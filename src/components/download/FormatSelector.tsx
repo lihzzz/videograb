@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AudioLines, Clapperboard } from "lucide-react";
+import { AudioLines, Clapperboard, MonitorSpeaker } from "lucide-react";
 import { useDownloadStore } from "../../stores/downloadStore";
 import type { VideoFormat } from "../../types/download";
 import { Button } from "../common/Button";
@@ -222,67 +222,73 @@ export function FormatSelector() {
   if (!currentVideo?.formats?.length) return null;
 
   return (
-    <div className="space-y-3 border border-border rounded-lg p-4 bg-card/60">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium">下载格式</label>
-        <span className="text-xs text-muted-foreground break-all max-w-[60%] text-right">
+    <div className="space-y-4 border border-border rounded-xl p-5 bg-card/60 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <label className="text-base font-medium text-gray-900">下载格式</label>
+        <div className="text-xs text-muted-foreground break-all max-w-full sm:max-w-[60%] bg-muted px-3 py-1.5 rounded-lg">
           当前表达式: {selectedFormat || "未选择"}
-        </span>
+        </div>
       </div>
 
       <div className="flex gap-2">
         <Button
           type="button"
-          size="sm"
+          size="md"
           variant={mode === "preset" ? "default" : "outline"}
           onClick={() => setMode("preset")}
+          className="flex-1"
         >
           内置方案
         </Button>
         <Button
           type="button"
-          size="sm"
+          size="md"
           variant={mode === "custom" ? "default" : "outline"}
           onClick={() => setMode("custom")}
+          className="flex-1"
         >
-          自定义分辨率
+          自定义
         </Button>
       </div>
 
       {mode === "preset" && (
-        <Select
-          value={presetValue}
-          onChange={(e) => setPresetValue(e.target.value)}
-          options={BUILTIN_PRESETS}
-        />
+        <div className="pt-2">
+          <Select
+            value={presetValue}
+            onChange={(e) => setPresetValue(e.target.value)}
+            options={BUILTIN_PRESETS}
+          />
+        </div>
       )}
 
       {mode === "custom" && (
-        <div className="space-y-3">
+        <div className="space-y-4 pt-2">
           <div className="flex gap-2">
             <Button
               type="button"
-              size="sm"
+              size="md"
               variant={customType === "video" ? "default" : "outline"}
               onClick={() => setCustomType("video")}
+              className="flex-1 flex items-center gap-2"
             >
-              <Clapperboard className="h-4 w-4 mr-1" />
+              <Clapperboard className="h-4 w-4" />
               视频
             </Button>
             <Button
               type="button"
-              size="sm"
+              size="md"
               variant={customType === "audio" ? "default" : "outline"}
               onClick={() => setCustomType("audio")}
+              className="flex-1 flex items-center gap-2"
             >
-              <AudioLines className="h-4 w-4 mr-1" />
+              <MonitorSpeaker className="h-4 w-4" />
               音频
             </Button>
           </div>
 
           {customType === "video" && (
             <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">视频分辨率</label>
+              <label className="text-sm text-muted-foreground block">视频分辨率</label>
               <Select
                 value={selectedVideoTrack}
                 onChange={(e) => setSelectedVideoTrack(e.target.value)}
@@ -295,7 +301,7 @@ export function FormatSelector() {
           )}
 
           <div className="space-y-2">
-            <label className="text-sm text-muted-foreground">
+            <label className="text-sm text-muted-foreground block">
               {customType === "audio" ? "音频质量" : "音频轨道"}
             </label>
             <Select
