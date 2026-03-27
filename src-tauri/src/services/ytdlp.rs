@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 pub struct YtDlpService {
     ytdlp_path: PathBuf,
     proxy: RwLock<Option<String>>,
+    cookies: RwLock<Option<String>>,
 }
 
 impl YtDlpService {
@@ -16,6 +17,7 @@ impl YtDlpService {
         Self {
             ytdlp_path,
             proxy: RwLock::new(None),
+            cookies: RwLock::new(None),
         }
     }
 
@@ -27,8 +29,20 @@ impl YtDlpService {
         *current = normalized;
     }
 
+    pub async fn set_cookies(&self, cookies: Option<String>) {
+        let normalized = cookies
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let mut current = self.cookies.write().await;
+        *current = normalized;
+    }
+
     async fn current_proxy(&self) -> Option<String> {
         self.proxy.read().await.clone()
+    }
+
+    async fn current_cookies(&self) -> Option<String> {
+        self.cookies.read().await.clone()
     }
 
     /// 更新 yt-dlp
@@ -59,6 +73,9 @@ impl YtDlpService {
         command.args(["--dump-single-json", "--no-download", "--no-warnings"]);
         if let Some(proxy) = self.current_proxy().await {
             command.arg("--proxy").arg(proxy);
+        }
+        if let Some(cookies) = self.current_cookies().await {
+            command.arg("--cookies").arg(cookies);
         }
         command.arg(url);
 
@@ -125,6 +142,9 @@ impl YtDlpService {
 
         if let Some(proxy) = self.current_proxy().await {
             command.arg("--proxy").arg(proxy);
+        }
+        if let Some(cookies) = self.current_cookies().await {
+            command.arg("--cookies").arg(cookies);
         }
         command.arg(url);
 

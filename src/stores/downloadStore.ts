@@ -4,10 +4,16 @@ import { listen } from "@tauri-apps/api/event";
 import type { VideoInfo, DownloadTask, DownloadProgress } from "../types/download";
 
 const PROXY_STORAGE_KEY = "videograb.proxy";
+const COOKIES_STORAGE_KEY = "videograb.cookies";
 
 function readStoredProxy(): string {
   if (typeof window === "undefined") return "";
   return (window.localStorage.getItem(PROXY_STORAGE_KEY) || "").trim();
+}
+
+function readStoredCookies(): string {
+  if (typeof window === "undefined") return "";
+  return (window.localStorage.getItem(COOKIES_STORAGE_KEY) || "").trim();
 }
 
 function persistProxy(proxy: string) {
@@ -16,6 +22,15 @@ function persistProxy(proxy: string) {
     window.localStorage.setItem(PROXY_STORAGE_KEY, proxy);
   } else {
     window.localStorage.removeItem(PROXY_STORAGE_KEY);
+  }
+}
+
+function persistCookies(cookies: string) {
+  if (typeof window === "undefined") return;
+  if (cookies) {
+    window.localStorage.setItem(COOKIES_STORAGE_KEY, cookies);
+  } else {
+    window.localStorage.removeItem(COOKIES_STORAGE_KEY);
   }
 }
 
@@ -43,6 +58,7 @@ interface DownloadStore {
   currentVideo: VideoInfo | null;
   selectedFormat: string | null;
   proxy: string;
+  cookies: string;
   isLoading: boolean;
   error: string | null;
   isUpdatingYtdlp: boolean;
@@ -56,7 +72,9 @@ interface DownloadStore {
   setCurrentUrl: (url: string) => void;
   setSelectedFormat: (formatId: string | null) => void;
   setProxy: (proxy: string) => void;
+  setCookies: (cookies: string) => void;
   syncProxyConfig: () => Promise<void>;
+  syncCookiesConfig: () => Promise<void>;
   fetchVideoInfo: (url: string) => Promise<void>;
   startDownload: (outputPath: string, isPlaylist?: boolean) => Promise<string | null>;
   cancelDownload: (taskId: string) => Promise<void>;
@@ -96,6 +114,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   currentVideo: null,
   selectedFormat: null,
   proxy: readStoredProxy(),
+  cookies: readStoredCookies(),
   isLoading: false,
   error: null,
   isUpdatingYtdlp: false,
@@ -115,10 +134,23 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     set({ proxy: normalizedProxy });
   },
 
+  setCookies: (cookies) => {
+    const normalizedCookies = cookies.trim();
+    persistCookies(normalizedCookies);
+    set({ cookies: normalizedCookies });
+  },
+
   syncProxyConfig: async () => {
     const proxy = get().proxy.trim();
     await invoke("set_proxy_config", {
       proxy: proxy || null,
+    });
+  },
+
+  syncCookiesConfig: async () => {
+    const cookies = get().cookies.trim();
+    await invoke("set_cookies_config", {
+      cookies: cookies || null,
     });
   },
 

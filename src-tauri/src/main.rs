@@ -35,6 +35,7 @@ fn main() {
             commands::select_download_folder,
             commands::get_default_download_path,
             commands::set_proxy_config,
+            commands::set_cookies_config,
             commands::update_ytdlp,
         ])
         .run(tauri::generate_context!())

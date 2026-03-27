@@ -2,6 +2,7 @@ import { Download, Sparkles, MonitorPlay } from "lucide-react";
 import { motion } from "framer-motion";
 import { UrlInput } from "../download/UrlInput";
 import { ProxyConfig } from "../download/ProxyConfig";
+import { CookiesConfig } from "../download/CookiesConfig";
 import { VideoPreview } from "../download/VideoPreview";
 import { FormatSelector } from "../download/FormatSelector";
 import { DownloadButton } from "../download/DownloadButton";
@@ -73,7 +74,10 @@ export function MainLayout() {
               <h3 className="text-lg font-semibold text-gray-900">添加下载链接</h3>
             </div>
             <UrlInput />
-            <ProxyConfig />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <ProxyConfig />
+              <CookiesConfig />
+            </div>
           </motion.div>
 
           {/* Video Preview & Format Selection */}

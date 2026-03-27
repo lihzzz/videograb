@@ -109,6 +109,16 @@ pub async fn set_proxy_config(
     Ok(())
 }
 
+/// 设置下载Cookies（为空时清除cookies）
+#[tauri::command]
+pub async fn set_cookies_config(
+    cookies: Option<String>,
+    ytdlp: tauri::State<'_, Arc<YtDlpService>>,
+) -> Result<(), String> {
+    ytdlp.set_cookies(cookies).await;
+    Ok(())
+}
+
 /// 更新 yt-dlp
 #[tauri::command]
 pub async fn update_ytdlp(
