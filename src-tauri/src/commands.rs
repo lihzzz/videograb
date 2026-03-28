@@ -20,15 +20,28 @@ pub async fn start_download(
     url: String,
     format_id: String,
     output_path: String,
-    ytdlp: tauri::State<'_, Arc<YtDlpService>>,
+    title: String,
+    thumbnail: Option<String>,
+    is_playlist: Option<bool>,
+    playlist_start: Option<i32>,
+    playlist_end: Option<i32>,
+    playlist_items: Option<String>,
+    _ytdlp: tauri::State<'_, Arc<YtDlpService>>,
     downloader: tauri::State<'_, Arc<DownloadManager>>,
 ) -> Result<String, String> {
-    // 先获取视频信息以获取标题
-    let video_info = ytdlp.fetch_video_info(&url).await?;
-
     // 创建任务
     let task_id = downloader
-        .create_task(url, video_info.title, format_id, output_path)
+        .create_task(
+            url.clone(),
+            title,
+            format_id,
+            output_path,
+            thumbnail,
+            is_playlist.unwrap_or(false),
+            playlist_start,
+            playlist_end,
+            playlist_items,
+        )
         .await;
 
     // 开始下载
@@ -94,4 +107,22 @@ pub async fn set_proxy_config(
 ) -> Result<(), String> {
     ytdlp.set_proxy(proxy).await;
     Ok(())
+}
+
+/// 设置下载Cookies（为空时清除cookies）
+#[tauri::command]
+pub async fn set_cookies_config(
+    cookies: Option<String>,
+    ytdlp: tauri::State<'_, Arc<YtDlpService>>,
+) -> Result<(), String> {
+    ytdlp.set_cookies(cookies).await;
+    Ok(())
+}
+
+/// 更新 yt-dlp
+#[tauri::command]
+pub async fn update_ytdlp(
+    _ytdlp: tauri::State<'_, Arc<YtDlpService>>,
+) -> Result<(), String> {
+    _ytdlp.update_ytdlp().await
 }

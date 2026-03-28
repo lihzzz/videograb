@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AudioLines, Clapperboard, MonitorSpeaker } from "lucide-react";
+import { Clapperboard, MonitorSpeaker } from "lucide-react";
 import { useDownloadStore } from "../../stores/downloadStore";
 import type { VideoFormat } from "../../types/download";
 import { Button } from "../common/Button";

@@ -1,4 +1,4 @@
-import { Download, CheckCircle, XCircle, Loader2, Pause, File, FolderOpen, Trash2 } from "lucide-react";
+import { Download, CheckCircle, XCircle, Loader2, Pause, File, Trash2, ListVideo } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import { Button } from "../common/Button";
@@ -72,12 +72,23 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
             <span className="text-xs text-muted-foreground">
               {getStatusText(task.status)}
             </span>
-            {task.format && (
+            {task.format_id && (
               <span className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                {task.format}
+                {task.format_id}
               </span>
             )}
           </div>
+
+          {/* 播放列表信息 */}
+          {task.is_playlist && task.playlist_title && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+              <ListVideo className="h-3 w-3" />
+              <span>{task.playlist_title}</span>
+              {task.playlist_size && (
+                <span>({task.playlist_size} 个项目)</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 操作按钮 */}
@@ -87,7 +98,7 @@ export function DownloadCard({ task }: { task: import("../../types/download").Do
               variant="ghost"
               size="sm"
               onClick={() => cancelDownload(task.id)}
-              className="h-8 w-8 p-0"
+              className="h8 w-8 p-0"
             >
               <Pause className="h-4 w-4" />
             </Button>

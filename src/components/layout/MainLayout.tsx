@@ -1,11 +1,13 @@
-import { Video, Download, Sparkles } from "lucide-react";
+import { Download, Sparkles, MonitorPlay } from "lucide-react";
 import { motion } from "framer-motion";
 import { UrlInput } from "../download/UrlInput";
 import { ProxyConfig } from "../download/ProxyConfig";
+import { CookiesConfig } from "../download/CookiesConfig";
 import { VideoPreview } from "../download/VideoPreview";
 import { FormatSelector } from "../download/FormatSelector";
 import { DownloadButton } from "../download/DownloadButton";
 import { DownloadList } from "../download/DownloadList";
+import { UpdateYtdlpButton } from "../download/UpdateYtdlpButton";
 import { useDownloadStore } from "../../stores/downloadStore";
 
 export function MainLayout() {
@@ -18,18 +20,20 @@ export function MainLayout() {
         <div className="px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Video className="h-8 w-8 text-primary-600" />
-              <Sparkles className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
+                <MonitorPlay className="h-6 w-6 text-white" />
+              </div>
+              <Sparkles className="h-3 w-3 text-yellow-400 absolute -top-1 -right-1" />
             </div>
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
                 VideoGrab
               </h1>
               <p className="text-xs text-muted-foreground">智能视频下载器</p>
             </div>
           </div>
-          <div className="text-sm text-muted-foreground hidden sm:block">
-            macOS 专业版
+          <div className="text-sm text-muted-foreground">
+            <UpdateYtdlpButton />
           </div>
         </div>
       </header>
@@ -44,6 +48,11 @@ export function MainLayout() {
         >
           {/* Hero Section */}
           <div className="text-center mb-10">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
+                <MonitorPlay className="h-8 w-8 text-white" />
+              </div>
+            </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-3">
               轻松下载视频
             </h2>
@@ -64,7 +73,10 @@ export function MainLayout() {
               <h3 className="text-lg font-semibold text-gray-900">添加下载链接</h3>
             </div>
             <UrlInput />
-            <ProxyConfig />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <ProxyConfig />
+              <CookiesConfig />
+            </div>
           </motion.div>
 
           {/* Video Preview & Format Selection */}
@@ -81,13 +93,19 @@ export function MainLayout() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50">
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 md:col-span-2">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">选择格式</h3>
-                  <FormatSelector />
-                </div>
-
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-border/50 flex flex-col justify-end">
-                  <DownloadButton />
+                  <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+                    <div className="xl:col-span-3">
+                      <FormatSelector />
+                    </div>
+                    <div className="xl:col-span-2">
+                      <div className="h-full rounded-xl border border-border/60 bg-secondary-50/30 p-4 flex flex-col justify-end">
+                        <h4 className="text-sm font-medium text-gray-900 mb-3">下载动作</h4>
+                        <DownloadButton />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </motion.div>

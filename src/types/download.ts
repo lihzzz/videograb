@@ -16,6 +16,18 @@ export interface VideoFormat {
   quality?: number;
 }
 
+export interface PlaylistInfo {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnail?: string;
+  uploader?: string;
+  view_count?: number;
+  channel?: string;
+  playlist_count?: number;
+  entries?: VideoInfo[];
+}
+
 export interface VideoInfo {
   id: string;
   title: string;
@@ -26,6 +38,11 @@ export interface VideoInfo {
   upload_date?: string;
   webpage_url: string;
   formats: VideoFormat[];
+  is_playlist?: boolean;
+  playlist_title?: string;
+  playlist_id?: string;
+  playlist_index?: number;
+  playlist_count?: number;
 }
 
 export interface DownloadProgress {
@@ -48,4 +65,7 @@ export interface DownloadTask {
   thumbnail?: string;
   created_at: number;
   error?: string;
+  is_playlist?: boolean;
+  playlist_title?: string;
+  playlist_size?: number;
 }

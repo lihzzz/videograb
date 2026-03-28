@@ -39,7 +39,7 @@ pub struct VideoInfo {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
-    pub thumbnail: String,
+    pub thumbnail: Option<String>,
     pub duration: Option<f64>,
     #[serde(rename = "webpage_url")]
     pub webpage_url: String,
@@ -47,6 +47,16 @@ pub struct VideoInfo {
     #[serde(rename = "upload_date")]
     pub upload_date: Option<String>,
     pub formats: Vec<VideoFormat>,
+    #[serde(rename = "is_playlist")]
+    pub is_playlist: Option<bool>,
+    #[serde(rename = "playlist_title")]
+    pub playlist_title: Option<String>,
+    #[serde(rename = "playlist_id")]
+    pub playlist_id: Option<String>,
+    #[serde(rename = "playlist_index")]
+    pub playlist_index: Option<i32>,
+    #[serde(rename = "playlist_count")]
+    pub playlist_count: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -74,6 +84,15 @@ pub struct DownloadTask {
     pub eta: String,
     pub output_path: String,
     pub format_id: String,
+    pub thumbnail: Option<String>,
+    #[serde(rename = "is_playlist")]
+    pub is_playlist: bool,
+    #[serde(rename = "playlist_start")]
+    pub playlist_start: Option<i32>,
+    #[serde(rename = "playlist_end")]
+    pub playlist_end: Option<i32>,
+    #[serde(rename = "playlist_items")]
+    pub playlist_items: Option<String>,
     #[serde(rename = "created_at")]
     pub created_at: String,
 }

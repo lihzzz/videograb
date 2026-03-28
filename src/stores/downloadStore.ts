@@ -4,10 +4,19 @@ import { listen } from "@tauri-apps/api/event";
 import type { VideoInfo, DownloadTask, DownloadProgress } from "../types/download";
 
 const PROXY_STORAGE_KEY = "videograb.proxy";
+const COOKIES_STORAGE_KEY = "videograb.cookies";
+const DEFAULT_PROXY = "socks5://127.0.0.1:9999";
 
 function readStoredProxy(): string {
+  if (typeof window === "undefined") return DEFAULT_PROXY;
+  const stored = window.localStorage.getItem(PROXY_STORAGE_KEY);
+  if (stored === null) return DEFAULT_PROXY;
+  return stored.trim();
+}
+
+function readStoredCookies(): string {
   if (typeof window === "undefined") return "";
-  return (window.localStorage.getItem(PROXY_STORAGE_KEY) || "").trim();
+  return (window.localStorage.getItem(COOKIES_STORAGE_KEY) || "").trim();
 }
 
 function persistProxy(proxy: string) {
@@ -16,6 +25,15 @@ function persistProxy(proxy: string) {
     window.localStorage.setItem(PROXY_STORAGE_KEY, proxy);
   } else {
     window.localStorage.removeItem(PROXY_STORAGE_KEY);
+  }
+}
+
+function persistCookies(cookies: string) {
+  if (typeof window === "undefined") return;
+  if (cookies) {
+    window.localStorage.setItem(COOKIES_STORAGE_KEY, cookies);
+  } else {
+    window.localStorage.removeItem(COOKIES_STORAGE_KEY);
   }
 }
 
@@ -28,8 +46,11 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-function buildOutputTemplate(outputDirectory: string): string {
+function buildOutputTemplate(outputDirectory: string, isPlaylist: boolean = false): string {
   const base = outputDirectory.trim().replace(/\/+$/, "");
+  if (isPlaylist) {
+    return `${base}/%(playlist)s/%(playlist_index)s - %(title)s.%(ext)s`;
+  }
   return `${base}/%(title)s.%(ext)s`;
 }
 
@@ -40,21 +61,32 @@ interface DownloadStore {
   currentVideo: VideoInfo | null;
   selectedFormat: string | null;
   proxy: string;
+  cookies: string;
   isLoading: boolean;
   error: string | null;
+  isUpdatingYtdlp: boolean;
+  playlistParams: {
+    start: number;
+    end: number | null;
+    items: string;
+  };
 
   // 方法
   setCurrentUrl: (url: string) => void;
   setSelectedFormat: (formatId: string | null) => void;
   setProxy: (proxy: string) => void;
+  setCookies: (cookies: string) => void;
   syncProxyConfig: () => Promise<void>;
+  syncCookiesConfig: () => Promise<void>;
   fetchVideoInfo: (url: string) => Promise<void>;
-  startDownload: (outputPath: string) => Promise<string | null>;
+  startDownload: (outputPath: string, isPlaylist?: boolean) => Promise<string | null>;
   cancelDownload: (taskId: string) => Promise<void>;
   updateProgress: (taskId: string, progress: DownloadProgress) => void;
   updateTaskStatus: (taskId: string, status: DownloadTask["status"], error?: string) => void;
   clearError: () => void;
   removeTask: (taskId: string) => void;
+  updatePlaylistParams: (params: { start?: number; end?: number | null; items?: string }) => void;
+  updateYtdlp: () => Promise<boolean>;
 }
 
 type BackendDownloadTask = Omit<DownloadTask, "created_at" | "thumbnail" | "error"> & {
@@ -85,23 +117,43 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   currentVideo: null,
   selectedFormat: null,
   proxy: readStoredProxy(),
+  cookies: readStoredCookies(),
   isLoading: false,
   error: null,
+  isUpdatingYtdlp: false,
+  playlistParams: {
+    start: 1,
+    end: null,
+    items: "",
+  },
 
   setCurrentUrl: (url) => set({ currentUrl: url }),
 
   setSelectedFormat: (formatId) => set({ selectedFormat: formatId }),
 
   setProxy: (proxy) => {
-    const normalizedProxy = proxy.trim();
+    const normalizedProxy = proxy.trim() || DEFAULT_PROXY;
     persistProxy(normalizedProxy);
     set({ proxy: normalizedProxy });
   },
 
+  setCookies: (cookies) => {
+    const normalizedCookies = cookies.trim();
+    persistCookies(normalizedCookies);
+    set({ cookies: normalizedCookies });
+  },
+
   syncProxyConfig: async () => {
-    const proxy = get().proxy.trim();
+    const proxy = get().proxy.trim() || DEFAULT_PROXY;
     await invoke("set_proxy_config", {
-      proxy: proxy || null,
+      proxy,
+    });
+  },
+
+  syncCookiesConfig: async () => {
+    const cookies = get().cookies.trim();
+    await invoke("set_cookies_config", {
+      cookies: cookies || null,
     });
   },
 
@@ -111,6 +163,29 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     set((state) => ({
       tasks: state.tasks.filter((t) => t.id !== taskId),
     }));
+  },
+
+  updatePlaylistParams: (params) => {
+    set((state) => ({
+      playlistParams: {
+        ...state.playlistParams,
+        ...params,
+      },
+    }));
+  },
+
+  updateYtdlp: async () => {
+    set({ isUpdatingYtdlp: true });
+    try {
+      await invoke("update_ytdlp");
+      return true;
+    } catch (err) {
+      console.error("更新 yt-dlp 失败:", err);
+      set({ error: getErrorMessage(err, "更新 yt-dlp 失败") });
+      return false;
+    } finally {
+      set({ isUpdatingYtdlp: false });
+    }
   },
 
   fetchVideoInfo: async (url) => {
@@ -125,23 +200,38 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     }
   },
 
-  startDownload: async (outputPath) => {
-    const { currentUrl, currentVideo, selectedFormat } = get();
+  startDownload: async (outputPath, isPlaylist = false) => {
+    const { currentUrl, currentVideo, selectedFormat, playlistParams } = get();
     if (!currentUrl || !currentVideo || !selectedFormat) return null;
 
     try {
-      const outputTemplate = buildOutputTemplate(outputPath);
+      const downloadUrl = isPlaylist
+        ? currentUrl
+        : (currentVideo.webpage_url || currentUrl);
+      const normalizedStart = Number.isFinite(playlistParams.start)
+        ? Math.max(1, Math.trunc(playlistParams.start))
+        : 1;
+      const normalizedEnd =
+        playlistParams.end == null || !Number.isFinite(playlistParams.end)
+          ? null
+          : Math.max(normalizedStart, Math.trunc(playlistParams.end));
+      const normalizedItems = (playlistParams.items || "").trim();
+      const outputTemplate = buildOutputTemplate(outputPath, isPlaylist);
       const taskId = await invoke<string>("start_download", {
-        url: currentUrl,
+        url: downloadUrl,
         formatId: selectedFormat,
         outputPath: outputTemplate,
         title: currentVideo.title,
         thumbnail: currentVideo.thumbnail,
+        isPlaylist,
+        playlistStart: isPlaylist ? normalizedStart : null,
+        playlistEnd: isPlaylist ? normalizedEnd : null,
+        playlistItems: isPlaylist && normalizedItems ? normalizedItems : null,
       });
 
       const fallbackTask: DownloadTask = {
         id: taskId,
-        url: currentUrl,
+        url: downloadUrl,
         title: currentVideo.title,
         status: "downloading",
         progress: 0,
@@ -151,6 +241,9 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         format_id: selectedFormat,
         thumbnail: currentVideo.thumbnail,
         created_at: Date.now(),
+        is_playlist: isPlaylist,
+        playlist_title: isPlaylist ? currentVideo.playlist_title || currentVideo.title : undefined,
+        playlist_size: isPlaylist ? currentVideo.playlist_count : undefined,
       };
 
       let taskToInsert = fallbackTask;

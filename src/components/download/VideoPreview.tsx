@@ -1,4 +1,4 @@
-import { Play, Clock, User, Calendar, VideoIcon, FileText } from "lucide-react";
+import { Clock, User, Calendar, VideoIcon, FileText, ListVideo } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDownloadStore } from "../../stores/downloadStore";
 import type { VideoFormat } from "../../types/download";
@@ -136,6 +136,13 @@ export function VideoPreview() {
             )}
           </div>
         )}
+
+        {currentVideo.is_playlist || currentVideo.playlist_count !== undefined ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border/50">
+            <ListVideo className="h-4 w-4" />
+            <span>播放列表: {currentVideo.playlist_count || '多个'} 个项目</span>
+          </div>
+        ) : null}
 
         {bestFormat && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-border/50">
