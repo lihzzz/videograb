@@ -4,8 +4,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::process::Command as TokioCommand;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 pub struct DownloadManager {
@@ -13,6 +15,7 @@ pub struct DownloadManager {
     ytdlp: Arc<YtDlpService>,
     tasks: Arc<Mutex<HashMap<String, DownloadTask>>>,
     running_tasks: Arc<Mutex<HashMap<String, JoinHandle<()>>>>,
+    running_pids: Arc<Mutex<HashMap<String, u32>>>,
 }
 
 impl DownloadManager {
@@ -22,6 +25,7 @@ impl DownloadManager {
             ytdlp,
             tasks: Arc::new(Mutex::new(HashMap::new())),
             running_tasks: Arc::new(Mutex::new(HashMap::new())),
+            running_pids: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -78,6 +82,7 @@ impl DownloadManager {
         let app_handle = self.app_handle.clone();
         let tasks_clone = self.tasks.clone();
         let running_tasks = self.running_tasks.clone();
+        let running_pids = self.running_pids.clone();
         let task_id_clone = task_id.to_string();
 
         let handle = tokio::spawn(async move {
@@ -94,6 +99,11 @@ impl DownloadManager {
                         task.playlist_items.as_deref(),
                     )
                     .await?;
+
+                if let Some(pid) = child.id() {
+                    let mut pids = running_pids.lock().await;
+                    pids.insert(task_id_clone.clone(), pid);
+                }
 
                 let stdout = child.stdout.take().ok_or("无法获取 stdout")?;
                 let stderr = child.stderr.take().ok_or("无法获取 stderr")?;
@@ -161,6 +171,8 @@ impl DownloadManager {
             // 清理运行中的任务
             let mut running = running_tasks.lock().await;
             running.remove(&task_id_clone);
+            let mut pids = running_pids.lock().await;
+            pids.remove(&task_id_clone);
         });
 
         let mut running = self.running_tasks.lock().await;
@@ -171,10 +183,20 @@ impl DownloadManager {
 
     /// 取消下载
     pub async fn cancel_download(&self, task_id: &str) -> Result<(), String> {
+        let pid = {
+            let mut pids = self.running_pids.lock().await;
+            pids.remove(task_id)
+        };
+
         // 停止任务
         let mut running = self.running_tasks.lock().await;
         if let Some(handle) = running.remove(task_id) {
             handle.abort();
+        }
+        drop(running);
+
+        if let Some(pid) = pid {
+            terminate_process_tree(pid).await;
         }
 
         // 更新任务状态
@@ -217,6 +239,30 @@ impl DownloadManager {
             task.eta = progress.eta;
         }
     }
+}
+
+async fn terminate_process_tree(pid: u32) {
+    let pid_text = pid.to_string();
+
+    let _ = TokioCommand::new("pkill")
+        .args(["-TERM", "-P", &pid_text])
+        .output()
+        .await;
+    let _ = TokioCommand::new("kill")
+        .args(["-TERM", &pid_text])
+        .output()
+        .await;
+
+    sleep(Duration::from_millis(300)).await;
+
+    let _ = TokioCommand::new("pkill")
+        .args(["-KILL", "-P", &pid_text])
+        .output()
+        .await;
+    let _ = TokioCommand::new("kill")
+        .args(["-KILL", &pid_text])
+        .output()
+        .await;
 }
 
 fn parse_progress_line(line: &str) -> Option<(f64, String, String)> {

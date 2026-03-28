@@ -1,9 +1,13 @@
 use crate::models::VideoInfo;
+use serde_json::Value;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{Output, Stdio};
 use tauri::{AppHandle, Manager};
 use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
+
+const DEFAULT_PROXY_URL: &str = "socks5://127.0.0.1:9999";
+const PLAYLIST_PREVIEW_SCAN_LIMIT: usize = 30;
 
 pub struct YtDlpService {
     ytdlp_path: PathBuf,
@@ -16,7 +20,7 @@ impl YtDlpService {
         let ytdlp_path = get_ytdlp_path(&app_handle);
         Self {
             ytdlp_path,
-            proxy: RwLock::new(None),
+            proxy: RwLock::new(Some(DEFAULT_PROXY_URL.to_string())),
             cookies: RwLock::new(None),
         }
     }
@@ -69,40 +73,60 @@ impl YtDlpService {
 
     /// 获取视频信息
     pub async fn fetch_video_info(&self, url: &str) -> Result<VideoInfo, String> {
-        let mut command = Command::new(&self.ytdlp_path);
-        command.args([
-            "--dump-single-json",
-            "--no-download",
-            "--no-warnings",
-            "--extractor-args", "youtube:player-client=web,yt-comment=force-legacy"
-        ]);
+        let mut errors: Vec<String> = Vec::new();
 
-        if let Some(proxy) = self.current_proxy().await {
-            command.arg("--proxy").arg(proxy);
-        }
-        if let Some(cookies) = self.current_cookies().await {
-            command.arg("--cookies").arg(cookies);
-        }
-        command.arg(url);
-
-        let output = command
-            .output()
+        // 1) 优先 flat-playlist 轻量探测
+        match self
+            .run_info_json(url, PlaylistMode::Auto, true, true)
             .await
-            .map_err(|e| format!("执行 yt-dlp 失败: {}", e))?;
-
-        if !output.status.success() {
-            return Err(format_command_failure(
-                "获取视频信息失败",
-                &output.status,
-                &output.stderr,
-                &output.stdout,
-            ));
+        {
+            Ok(probe_value) => {
+                if let Some(result) = self.try_parse_video_info(url, &probe_value).await {
+                    return result;
+                }
+                errors.push("flat-playlist 返回内容不可用".to_string());
+            }
+            Err(err) => {
+                errors.push(err);
+            }
         }
 
-        let info: VideoInfo = serde_json::from_slice(&output.stdout)
-            .map_err(|e| format!("解析视频信息失败: {}", e))?;
+        // 2) 回退到 no-playlist 直接拉单视频详情
+        match self
+            .run_info_json(url, PlaylistMode::NoPlaylist, false, false)
+            .await
+        {
+            Ok(value) => {
+                if let Some(result) = self.try_parse_video_info(url, &value).await {
+                    return result;
+                }
+                errors.push("no-playlist 返回内容不可用".to_string());
+            }
+            Err(err) => {
+                errors.push(err);
+            }
+        }
 
-        Ok(info)
+        // 3) 最后再走一次 yes-playlist 全量信息
+        match self
+            .run_info_json(url, PlaylistMode::Auto, false, false)
+            .await
+        {
+            Ok(value) => {
+                if let Some(result) = self.try_parse_video_info(url, &value).await {
+                    return result;
+                }
+                errors.push("yes-playlist 返回内容不可用".to_string());
+            }
+            Err(err) => {
+                errors.push(err);
+            }
+        }
+
+        Err(errors
+            .last()
+            .cloned()
+            .unwrap_or_else(|| "获取视频信息失败: 未返回可用 JSON".to_string()))
     }
 
     /// 开始下载，返回子进程
@@ -118,6 +142,7 @@ impl YtDlpService {
         playlist_items: Option<&str>,
     ) -> Result<Child, String> {
         let mut command = Command::new(&self.ytdlp_path);
+        command.kill_on_drop(true);
         let mut args = vec![
             "-f",
             format_id,
@@ -128,38 +153,26 @@ impl YtDlpService {
             "--progress-template",
             "%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
             "--no-warnings",
-            "--extractor-args", "youtube:player-client=web,yt-comment=force-legacy"
+            "--ignore-config",
         ];
 
-        // 如果是播放列表，添加忽略错误的选项
         if is_playlist {
-            args.extend(&["--ignore-errors"]);
+            args.extend(&["--yes-playlist", "--ignore-errors"]);
+        } else {
+            args.extend(&["--no-playlist"]);
         }
 
         command.args(args);
 
-        // 添加播放列表相关参数
         if is_playlist {
-            if let Some(start) = playlist_start {
-                command.arg("--playlist-start").arg(start.to_string());
+            if let Some(item_spec) =
+                build_playlist_item_spec(playlist_start, playlist_end, playlist_items)
+            {
+                command.arg("--playlist-items").arg(item_spec);
             }
-            if let Some(end) = playlist_end {
-                command.arg("--playlist-end").arg(end.to_string());
-            }
-            if let Some(items) = playlist_items {
-                command.arg("--playlist-items").arg(items);
-            }
-        } else {
-            // 不是播放列表则只下载第一个视频
-            command.arg("--playlist-start").arg("1").arg("--playlist-end").arg("1");
         }
 
-        if let Some(proxy) = self.current_proxy().await {
-            command.arg("--proxy").arg(proxy);
-        }
-        if let Some(cookies) = self.current_cookies().await {
-            command.arg("--cookies").arg(cookies);
-        }
+        self.apply_network_args(&mut command).await;
         command.arg(url);
 
         let child = command
@@ -173,6 +186,193 @@ impl YtDlpService {
 
         Ok(child)
     }
+
+    async fn build_playlist_preview(
+        &self,
+        source_url: &str,
+        playlist_value: &Value,
+    ) -> Result<VideoInfo, String> {
+        let entries = playlist_value
+            .get("entries")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "播放列表缺少可用条目".to_string())?;
+
+        let context = PlaylistContext {
+            title: read_string_field(playlist_value, &["title", "playlist_title"]),
+            playlist_id: read_string_field(playlist_value, &["id", "playlist_id"]),
+            count: read_i32_field(playlist_value, &["playlist_count", "n_entries"])
+                .or_else(|| i32::try_from(entries.len()).ok()),
+        };
+
+        for entry in entries.iter().take(PLAYLIST_PREVIEW_SCAN_LIMIT) {
+            if let Ok(info) = self.deserialize_video_info(entry.clone(), "解析播放列表条目失败") {
+                return Ok(apply_playlist_context(info, &context));
+            }
+
+            if let Some(entry_url) = resolve_entry_url(entry, source_url) {
+                if let Ok(entry_value) = self
+                    .run_info_json(&entry_url, PlaylistMode::NoPlaylist, false, false)
+                    .await
+                {
+                    if let Ok(info) = self.deserialize_video_info(entry_value, "解析条目详情失败") {
+                        return Ok(apply_playlist_context(info, &context));
+                    }
+                }
+            }
+        }
+
+        Err("播放列表中没有可解析的公开视频条目，请检查 cookies 或列表权限".to_string())
+    }
+
+    fn deserialize_video_info(&self, value: Value, context: &str) -> Result<VideoInfo, String> {
+        serde_json::from_value(value).map_err(|e| format!("{}: {}", context, e))
+    }
+
+    async fn try_parse_video_info(
+        &self,
+        source_url: &str,
+        value: &Value,
+    ) -> Option<Result<VideoInfo, String>> {
+        if value.is_null() {
+            return None;
+        }
+
+        if is_playlist_payload(value) {
+            return Some(self.build_playlist_preview(source_url, value).await);
+        }
+
+        Some(self.deserialize_video_info(value.clone(), "解析视频信息失败"))
+    }
+
+    async fn run_info_json(
+        &self,
+        url: &str,
+        playlist_mode: PlaylistMode,
+        flat_playlist: bool,
+        ignore_errors: bool,
+    ) -> Result<Value, String> {
+        let mut command = Command::new(&self.ytdlp_path);
+        command.args([
+            "--dump-single-json",
+            "--no-download",
+            "--no-warnings",
+            "--ignore-config",
+        ]);
+        if ignore_errors {
+            command.arg("--ignore-errors");
+        }
+
+        match playlist_mode {
+            PlaylistMode::Auto => {
+                command.arg("--yes-playlist");
+            }
+            PlaylistMode::NoPlaylist => {
+                command.arg("--no-playlist");
+            }
+        }
+        if flat_playlist {
+            command.arg("--flat-playlist");
+        }
+
+        self.apply_network_args(&mut command).await;
+        command.arg(url);
+
+        let output = command
+            .output()
+            .await
+            .map_err(|e| format!("执行 yt-dlp 失败: {}", e))?;
+
+        parse_json_output("获取视频信息失败", output)
+    }
+
+    async fn apply_network_args(&self, command: &mut Command) {
+        if let Some(proxy) = self.current_proxy().await {
+            command.arg("--proxy").arg(proxy);
+        }
+        if let Some(cookies) = self.current_cookies().await {
+            command.arg("--cookies").arg(cookies);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum PlaylistMode {
+    Auto,
+    NoPlaylist,
+}
+
+struct PlaylistContext {
+    title: Option<String>,
+    playlist_id: Option<String>,
+    count: Option<i32>,
+}
+
+fn is_playlist_payload(value: &Value) -> bool {
+    value
+        .get("_type")
+        .and_then(Value::as_str)
+        .map(|kind| kind == "playlist")
+        .unwrap_or(false)
+        || value
+            .get("entries")
+            .and_then(Value::as_array)
+            .map(|entries| !entries.is_empty())
+            .unwrap_or(false)
+}
+
+fn apply_playlist_context(mut info: VideoInfo, context: &PlaylistContext) -> VideoInfo {
+    info.is_playlist = Some(true);
+    if let Some(title) = &context.title {
+        info.playlist_title = Some(title.clone());
+        if info.title.trim().is_empty() {
+            info.title = title.clone();
+        }
+    }
+    if let Some(playlist_id) = &context.playlist_id {
+        info.playlist_id = Some(playlist_id.clone());
+    }
+    if let Some(count) = context.count {
+        info.playlist_count = Some(count);
+    }
+    info
+}
+
+fn resolve_entry_url(entry: &Value, source_url: &str) -> Option<String> {
+    if let Some(webpage_url) = entry.get("webpage_url").and_then(Value::as_str) {
+        if webpage_url.starts_with("http://") || webpage_url.starts_with("https://") {
+            return Some(webpage_url.to_string());
+        }
+    }
+
+    if let Some(raw_url) = entry.get("url").and_then(Value::as_str) {
+        if raw_url.starts_with("http://") || raw_url.starts_with("https://") {
+            return Some(raw_url.to_string());
+        }
+        if raw_url.starts_with("watch?v=") || raw_url.starts_with("shorts/") {
+            return Some(format!("https://www.youtube.com/{}", raw_url));
+        }
+    }
+
+    if source_url.contains("youtube.com") || source_url.contains("youtu.be") {
+        if let Some(video_id) = entry.get("id").and_then(Value::as_str) {
+            return Some(format!("https://www.youtube.com/watch?v={}", video_id));
+        }
+    }
+
+    None
+}
+
+fn read_string_field(value: &Value, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .find_map(|key| value.get(*key).and_then(Value::as_str))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+fn read_i32_field(value: &Value, keys: &[&str]) -> Option<i32> {
+    keys.iter()
+        .filter_map(|key| value.get(*key))
+        .find_map(|v| v.as_i64().and_then(|n| i32::try_from(n).ok()))
 }
 
 /// 获取 yt-dlp 可执行文件路径
@@ -193,6 +393,49 @@ fn get_ytdlp_path(app_handle: &AppHandle) -> PathBuf {
 
     // 回退到系统 PATH 中的 yt-dlp
     PathBuf::from("yt-dlp")
+}
+
+fn parse_json_output(context: &str, output: Output) -> Result<Value, String> {
+    if !output.stdout.is_empty() {
+        if let Ok(value) = serde_json::from_slice::<Value>(&output.stdout) {
+            if value.is_null() {
+                let stderr_text = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                if !stderr_text.is_empty() {
+                    return Err(format!("{}: {}", context, stderr_text));
+                }
+                return Err(format!("{}: yt-dlp 返回空结果(null)", context));
+            }
+            return Ok(value);
+        }
+    }
+
+    Err(format_command_failure(
+        context,
+        &output.status,
+        &output.stderr,
+        &output.stdout,
+    ))
+}
+
+fn build_playlist_item_spec(
+    playlist_start: Option<i32>,
+    playlist_end: Option<i32>,
+    playlist_items: Option<&str>,
+) -> Option<String> {
+    if let Some(items) = playlist_items {
+        let normalized_items = items.trim();
+        if !normalized_items.is_empty() {
+            return Some(normalized_items.to_string());
+        }
+    }
+
+    let start = playlist_start.unwrap_or(1).max(1);
+    match playlist_end {
+        Some(end) if end >= start => Some(format!("{}:{}", start, end)),
+        Some(_) => Some(start.to_string()),
+        None if start > 1 => Some(format!("{}:", start)),
+        None => None,
+    }
 }
 
 fn format_command_failure(

@@ -39,7 +39,7 @@ pub struct VideoInfo {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
-    pub thumbnail: String,
+    pub thumbnail: Option<String>,
     pub duration: Option<f64>,
     #[serde(rename = "webpage_url")]
     pub webpage_url: String,

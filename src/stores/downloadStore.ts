@@ -5,10 +5,13 @@ import type { VideoInfo, DownloadTask, DownloadProgress } from "../types/downloa
 
 const PROXY_STORAGE_KEY = "videograb.proxy";
 const COOKIES_STORAGE_KEY = "videograb.cookies";
+const DEFAULT_PROXY = "socks5://127.0.0.1:9999";
 
 function readStoredProxy(): string {
-  if (typeof window === "undefined") return "";
-  return (window.localStorage.getItem(PROXY_STORAGE_KEY) || "").trim();
+  if (typeof window === "undefined") return DEFAULT_PROXY;
+  const stored = window.localStorage.getItem(PROXY_STORAGE_KEY);
+  if (stored === null) return DEFAULT_PROXY;
+  return stored.trim();
 }
 
 function readStoredCookies(): string {
@@ -46,7 +49,7 @@ function getErrorMessage(err: unknown, fallback: string): string {
 function buildOutputTemplate(outputDirectory: string, isPlaylist: boolean = false): string {
   const base = outputDirectory.trim().replace(/\/+$/, "");
   if (isPlaylist) {
-    return `${base}/%(playlist_title,playlist)s/%(playlist_index)s - %(title)s.%(ext)s`;
+    return `${base}/%(playlist)s/%(playlist_index)s - %(title)s.%(ext)s`;
   }
   return `${base}/%(title)s.%(ext)s`;
 }
@@ -129,7 +132,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   setSelectedFormat: (formatId) => set({ selectedFormat: formatId }),
 
   setProxy: (proxy) => {
-    const normalizedProxy = proxy.trim();
+    const normalizedProxy = proxy.trim() || DEFAULT_PROXY;
     persistProxy(normalizedProxy);
     set({ proxy: normalizedProxy });
   },
@@ -141,9 +144,9 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
   },
 
   syncProxyConfig: async () => {
-    const proxy = get().proxy.trim();
+    const proxy = get().proxy.trim() || DEFAULT_PROXY;
     await invoke("set_proxy_config", {
-      proxy: proxy || null,
+      proxy,
     });
   },
 
@@ -202,22 +205,33 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
     if (!currentUrl || !currentVideo || !selectedFormat) return null;
 
     try {
+      const downloadUrl = isPlaylist
+        ? currentUrl
+        : (currentVideo.webpage_url || currentUrl);
+      const normalizedStart = Number.isFinite(playlistParams.start)
+        ? Math.max(1, Math.trunc(playlistParams.start))
+        : 1;
+      const normalizedEnd =
+        playlistParams.end == null || !Number.isFinite(playlistParams.end)
+          ? null
+          : Math.max(normalizedStart, Math.trunc(playlistParams.end));
+      const normalizedItems = (playlistParams.items || "").trim();
       const outputTemplate = buildOutputTemplate(outputPath, isPlaylist);
       const taskId = await invoke<string>("start_download", {
-        url: currentUrl,
+        url: downloadUrl,
         formatId: selectedFormat,
         outputPath: outputTemplate,
         title: currentVideo.title,
         thumbnail: currentVideo.thumbnail,
         isPlaylist,
-        playlistStart: playlistParams.start,
-        playlistEnd: playlistParams.end,
-        playlistItems: playlistParams.items,
+        playlistStart: isPlaylist ? normalizedStart : null,
+        playlistEnd: isPlaylist ? normalizedEnd : null,
+        playlistItems: isPlaylist && normalizedItems ? normalizedItems : null,
       });
 
       const fallbackTask: DownloadTask = {
         id: taskId,
-        url: currentUrl,
+        url: downloadUrl,
         title: currentVideo.title,
         status: "downloading",
         progress: 0,
